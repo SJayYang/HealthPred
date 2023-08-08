@@ -133,10 +133,9 @@ if __name__ == "__main__":
 
     # class encoding 
     # NOTE: change to use different discretization 
-    df["Mean_BMI_bin"] = np.select(
-        [df["Mean_BMI"] <= 19.9, df["Mean_BMI"] <= 24.9, True], 
-        [0, 1, 2]
-    )
+    # Use this line to make a new csv file
+    df["Mean_BMI_bin"] = pd.qcut(df["Mean_BMI"], q=5, labels=False)
+    
     N_CLASSES = df["Mean_BMI_bin"].drop_duplicates().shape[0]
     dhsid_label_dict = dict(zip(df["DHSID"], df["Mean_BMI_bin"]))
 
@@ -149,7 +148,7 @@ if __name__ == "__main__":
     # make folders (TODO: check if they exist)
     if not os.path.exists(out_folder):
         os.makedirs(out_folder)
-    N_CLASSES = 3
+    N_CLASSES = df["Mean_BMI_bin"].drop_duplicates().shape[0]
     for i in range(N_CLASSES):
         if not os.path.exists(out_folder + "class_" + str(i)):
           os.mkdir(out_folder + "class_" + str(i))
