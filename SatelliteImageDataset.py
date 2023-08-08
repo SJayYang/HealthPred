@@ -21,10 +21,15 @@ class SatelliteImageDataset(Dataset):
 
         image_filepath = self.root + "/" + self.image_paths[idx]
         img = self.img_loader(image_filepath)
+        import re
+
+        def remove_pattern(string):
+            new_string = re.sub(r'_\d{4}_', '', string)
+            return new_string
 
         # everything before extension 
         img_dhsid = self.image_paths[idx].split('.')[0]
-        label = self.outcome_dict[img_dhsid]
+        label = self.outcome_dict[remove_pattern(img_dhsid)]
 
         return img, label
 

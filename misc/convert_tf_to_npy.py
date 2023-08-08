@@ -1,5 +1,5 @@
 import os
-import tensorflow as tf
+# import tensorflow as tf
 import numpy as np
 import pandas as pd 
 import matplotlib.pyplot as plt
@@ -13,25 +13,20 @@ import numpy as np
 import pandas as pd 
 import matplotlib.pyplot as plt
 import cv2 
+import pdb
 
 from tqdm import tqdm 
+import re
 
 train_feature_description = {
-  "BLUE": tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
-  "GREEN": tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
-  "RED": tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
-  "NIR": tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
-  "SWIR1": tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
-  "SWIR2": tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
-  "TEMP1": tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
-  "V001": tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
-  "V000": tf.io.FixedLenSequenceFeature([], tf.string, allow_missing=True),
-  "LATNUM": tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
-  "LONGNUM": tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
-  "V445": tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
-  "V006": tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
-  "V007": tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
-}
+        'DHSID': tf.io.FixedLenFeature([], tf.string),
+        'Mean_BMI': tf.io.FixedLenFeature([], tf.float32),
+        'Median_BMI': tf.io.FixedLenFeature([], tf.float32),
+        'Under5_Mortality_Rate': tf.io.FixedLenFeature([], tf.float32),
+        'GREEN': tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
+        'RED':  tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
+        'BLUE':  tf.io.FixedLenSequenceFeature([], tf.float32, allow_missing=True),
+    }
 
 def _parse_image_function(example_proto):
   return tf.io.parse_single_example(example_proto, train_feature_description)
@@ -40,10 +35,10 @@ def convert_filename_to_dhsid(file):
   code = file[0:6]
   num = file.split("_")[-1].split(".")[0]
   num_just = num.rjust(8, "0")
-  return code + num_just
+  return (code + num_just, code + "_" + code[2:6] + "_" + num_just + ".0")
 
 def check_valid_file(file, dhsid_dict):
-  return convert_filename_to_dhsid(file) in dhsid_dict
+  return convert_filename_to_dhsid(file)[0] in dhsid_dict
 
 def convert_tfrec_to_npy(in_files_paths, out_folder, label_dict):
     train_image_dataset = tf.data.TFRecordDataset(in_files_paths)
@@ -86,30 +81,49 @@ def convert_tfrec_to_npy(in_files_paths, out_folder, label_dict):
         norm_image = norm_image.astype("uint8")
 
         # get dhsid
-        dhsid = convert_filename_to_dhsid(in_files_paths_ok[i].split("/")[-1])
+        (dhsid, file_name) = convert_filename_to_dhsid(in_files_paths_ok[i].split("/")[-1])
 
         # class label 
         label = label_dict[dhsid]
 
-        np.save(out_folder + "class_" + str(label) + "/" + dhsid + ".npy", norm_image)
+        np.save(out_folder + "class_" + str(label) + "/" + file_name + ".npy", norm_image)
 
 
 if __name__ == "__main__":
 
     ## NOTE: FILL THESE IN: 
-    country_codes = []
+    country_codes = ["BJ"]
+    year_codes = ["1996"]
     # main project directory 
-    PROJECT_FOLDER = "FILL THIS IN"
+    PROJECT_FOLDER = "/deep/u/sjayyang/tfrecords"
     # where data folders are stored (probably full_dataset_tfrecord)
-    in_folder = PROJECT_FOLDER + "/" + "IN_FOLDER"
+    in_folder = PROJECT_FOLDER + "/" + "tfrecords_fake/"
     # where dat folders should be  written 
-    out_folder = PROJECT_FOLDER + "/" + "OUT_FOLDER/" 
+    out_folder = PROJECT_FOLDER + "/" + "tfrecords_fake_out/" 
 
     # make sure path is correct 
-    df = pd.read_csv("hi.csv")
+    CSV_FILE = "/deep2/u/sjayyang/hi.csv"
+    print("Reading csv file")
+    df = pd.read_csv(CSV_FILE)
+    print("Finished csv file")
+
+    # Function to extract the country code from the file name
+    def extract_country_code(file_name):
+        return re.search(r'^([A-Za-z]{2})', file_name).group(1)
+
+    # Function to extract the year from the file name
+    def extract_year(file_name):
+        return re.search(r'[0-9]{4}', file_name).group()
+
+    # Create new columns in the DataFrame using the apply function
+    df['country'] = df['DHSID'].apply(extract_country_code)
+    df['year'] = df['DHSID'].apply(extract_year)
 
     # filter to countries of interest
-    df = df.loc[df["DHSID"].str[0:2].isin(country_codes)]
+    # substring_list = df['DHSID'].str[:2].tolist()
+    # country_codes = list(set(substring_list))
+    df = df.loc[df["country"].isin(country_codes)]
+    df = df.loc[df["year"].isin(year_codes)]
 
     # pick the year with most images for each country
     df_cntry_yr = df.groupby(["country", "year"])["DHSID"].count() \
@@ -133,9 +147,12 @@ if __name__ == "__main__":
     country_year_pairs = [(countries[i], years[i]) for i in range(countries.shape[0])]
 
     # make folders (TODO: check if they exist)
-    os.mkdir(out_folder)
+    if not os.path.exists(out_folder):
+        os.makedirs(out_folder)
+    N_CLASSES = 3
     for i in range(N_CLASSES):
-      os.mkdir(out_folder + "class_" + str(i))
+        if not os.path.exists(out_folder + "class_" + str(i)):
+          os.mkdir(out_folder + "class_" + str(i))
 
     # loop over each pair
     for c, y in country_year_pairs: 
