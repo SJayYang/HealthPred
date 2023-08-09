@@ -92,17 +92,18 @@ def convert_tfrec_to_npy(in_files_paths, out_folder, label_dict):
 if __name__ == "__main__":
 
     ## NOTE: FILL THESE IN: 
-    country_codes = ["BJ"]
-    year_codes = ["1996"]
+    country_codes = ["AL", "MW"]
+    # year_codes = ["1996"]
     # main project directory 
     PROJECT_FOLDER = "/deep/u/sjayyang/tfrecords"
     # where data folders are stored (probably full_dataset_tfrecord)
-    in_folder = PROJECT_FOLDER + "/" + "tfrecords_fake/"
+    in_folder = PROJECT_FOLDER + "/" + "gdrive/"
     # where dat folders should be  written 
-    out_folder = PROJECT_FOLDER + "/" + "tfrecords_fake_out/" 
+    out_folder = PROJECT_FOLDER + "/" + "tfrecords_test_out/" 
 
     # make sure path is correct 
     CSV_FILE = "/deep2/u/sjayyang/hi.csv"
+    CSV_FILE_NEW = "/deep2/u/sjayyang/hi2.csv"
     print("Reading csv file")
     df = pd.read_csv(CSV_FILE)
     print("Finished csv file")
@@ -120,10 +121,10 @@ if __name__ == "__main__":
     df['year'] = df['DHSID'].apply(extract_year)
 
     # filter to countries of interest
-    # substring_list = df['DHSID'].str[:2].tolist()
-    # country_codes = list(set(substring_list))
+    substring_list = [re.match(r'^[A-Za-z]+', id_string).group() for id_string in df['DHSID'].tolist() if re.match(r'^[A-Za-z]+', id_string)]
+    country_codes = list(set(substring_list))
     df = df.loc[df["country"].isin(country_codes)]
-    df = df.loc[df["year"].isin(year_codes)]
+    # df = df.loc[df["year"].isin(year_codes)]
 
     # pick the year with most images for each country
     df_cntry_yr = df.groupby(["country", "year"])["DHSID"].count() \
@@ -134,7 +135,12 @@ if __name__ == "__main__":
     # class encoding 
     # NOTE: change to use different discretization 
     # Use this line to make a new csv file
-    df["Mean_BMI_bin"] = pd.qcut(df["Mean_BMI"], q=5, labels=False)
+    outcome_name = "Mean_BMI"
+    df["Mean_BMI_bin"] = pd.qcut(df[outcome_name], q=5, labels=False)
+    df.to_csv(CSV_FILE_NEW)
+
+    df.dropna(subset=["Mean_BMI_bin"], inplace=True)
+    df["Mean_BMI_bin"] = df["Mean_BMI_bin"].astype(int)
     
     N_CLASSES = df["Mean_BMI_bin"].drop_duplicates().shape[0]
     dhsid_label_dict = dict(zip(df["DHSID"], df["Mean_BMI_bin"]))
@@ -156,10 +162,10 @@ if __name__ == "__main__":
     # loop over each pair
     for c, y in country_year_pairs: 
         print(f"Country {c} in year {y}")
-        in_folder = in_folder + c + str(y) + "_" + str(y) + "/"
-        in_files = os.listdir(in_folder)
+        in_folder_new = in_folder + c + str(y) + "_" + str(y) + "/"
+        in_files = os.listdir(in_folder_new)
         in_files = [f for f in in_files if check_valid_file(f, dhsid_label_dict)]
-        in_files_paths = [in_folder + f for f in in_files]
+        in_files_paths = [in_folder_new + f for f in in_files]
         
         # convert 
         convert_tfrec_to_npy(in_files_paths, out_folder, dhsid_label_dict)
