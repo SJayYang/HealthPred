@@ -128,10 +128,13 @@ def create_model_and_collator(args, model_name):
 
 class RegressionImageDataset(Dataset):
 
-    def __init__(self, root, loader):
+    def __init__(self, root, loader, csv_path, outcome):
 
         self.root = root 
         self.image_paths = os.listdir(root)
+        self.data = pd.read_csv(csv_path + ".csv")
+        self.outcome = outcome
+        self.outcome_dict = dict(zip(self.data["DHSID"], self.data[outcome]))
         self.loader = loader
 
     def __len__(self):
@@ -142,9 +145,11 @@ class RegressionImageDataset(Dataset):
         image_filepath = self.root + "/" + self.image_paths[idx]
         img = self.loader(image_filepath)
 
-        label_string = self.image_paths[idx].split("_")[1].split(".")[0]
-        label_string = label_string.replace("dot", ".")
-        label = float(label_string)
+        # label_string = self.image_paths[idx].split("_")[1].split(".")[0]
+        # label_string = label_string.replace("dot", ".")
+        img_dhsid = self.image_paths[idx].split('.')[0]
+        label = self.outcome_dict[img_dhsid]
+        label = float(label)
 
         return img, label
 
@@ -158,6 +163,8 @@ def create_dataset(args, collator_fns, extensions = ['.npy'], val_split = 0.15):
     # load in dataset frmom directory 
     dataset = RegressionImageDataset(
         root = args.data_dir, 
+        csv_path = args.csv_file, 
+        outcome = args.outcome, 
         loader = npy_loader
     )
     # split up into train val data  
@@ -203,13 +210,18 @@ def validation(args, val_loader, model, criterion, device, name = 'Validation', 
         total_loss += loss.cpu().item()
 
 
-    print(f'*** Average batch loss on the {name} set: {total_loss / i})')
+    print(f'*** Average batch loss on the {name} set: {total_loss / i}')
     cor = np.corrcoef(logits.cpu().numpy().squeeze(), labels.cpu().numpy().squeeze())
-    print(f'*** Correlation between predictions and labels: {np.round(cor[0, 1], 2)}')
+    print(f'*** Correlation between predictions and labels: {np.round(cor[0, 1], 2)}') # TODO: don't need correlation actually
     print(f'*** Last five preds: {logits.cpu().numpy()[-5:]}')
     print(f'*** Last five labels: {labels.cpu().numpy()[-5:]}')
-
+    if write_file:
+        write_file.write(f'*** Average batch loss on the {name} set: {total_loss / i}\n')
+        write_file.write(f'*** Correlation between predictions and labels: {np.round(cor[0, 1], 2)}\n')
+        write_file.write(f'*** Last five preds: {logits.cpu().numpy()[-5:]}\n')
+        write_file.write(f'*** Last five labels: {labels.cpu().numpy()[-5:]}\n')
     return  total_loss
+    
 
 
 
@@ -256,10 +268,10 @@ def train(args, data_loaders, epoch_n, model, optim, scheduler, criterion, devic
             if scheduler: scheduler.step()
 
             if i % args.val_every == 0: 
-                print(f'*** Average Loss: {total_train_loss / (i+1)}')
+                print(f'*** Average Train Loss: {total_train_loss / (i+1)}')
                 if write_file:
                     write_file.write(f'\nEpoch: {epoch}, Step: {i}\n')
-                    write_file.write(f'*** Average Loss: {total_train_loss / (i+1)}')
+                    write_file.write(f'*** Average Train Loss: {total_train_loss / (i+1)}\n')
 
                 val_loss = validation(args, data_loaders[1], model, criterion, device, write_file=write_file)
 
@@ -287,6 +299,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--data_dir', type=str, default = 'Mean_BMI_bin', help='Image data location.')
+    parser.add_argument('--csv_file', type=str, help='CSV file with labels.')
+    parser.add_argument('--outcome', type=str, help='Label of outcome variable in df.')
 
     #parser.add_argument('--n_classes', default=3, type=int, help='Number of classes in outcome variable.')	
     parser.add_argument('--batch_size', default=16, type=int, help='Batch size.')
