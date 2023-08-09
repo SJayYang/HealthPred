@@ -35,10 +35,12 @@ def convert_filename_to_dhsid(file):
   code = file[0:6]
   num = file.split("_")[-1].split(".")[0]
   num_just = num.rjust(8, "0")
-  return (code + num_just, code + "_" + code[2:6] + "_" + num_just + ".0")
+  return code + num_just
+#   return (code + num_just, code + "_" + code[2:6] + "_" + num_just + ".0")
+
 
 def check_valid_file(file, dhsid_dict):
-  return convert_filename_to_dhsid(file)[0] in dhsid_dict
+  return convert_filename_to_dhsid(file) in dhsid_dict
 
 def convert_tfrec_to_npy(in_files_paths, out_folder, label_dict):
     train_image_dataset = tf.data.TFRecordDataset(in_files_paths)
@@ -81,31 +83,45 @@ def convert_tfrec_to_npy(in_files_paths, out_folder, label_dict):
         norm_image = norm_image.astype("uint8")
 
         # get dhsid
-        (dhsid, file_name) = convert_filename_to_dhsid(in_files_paths_ok[i].split("/")[-1])
+        dhsid = convert_filename_to_dhsid(in_files_paths_ok[i].split("/")[-1])
 
         # class label 
         label = label_dict[dhsid]
 
-        np.save(out_folder + "class_" + str(label) + "/" + file_name + ".npy", norm_image)
+        # # save path
+        # # NOTE: need this only you want to save each class to separate folders
+        # img_save_path = out_folder + "class_" + str(label) + "/" + dhsid + ".npy"
+
+        # if not os.path.exists(out_folder + "class_" + str(label)):
+        #   os.mkdir(out_folder + "class_" + str(label))
+
+        # Save all images under same "out_folder" path
+        img_save_path = out_folder + "/" + dhsid + ".npy"
+        np.save(img_save_path, norm_image)
 
 
 if __name__ == "__main__":
 
     ## NOTE: FILL THESE IN: 
-    country_codes = ["BJ"]
-    year_codes = ["1996"]
+    country_codes = ["AL"]
+    year_codes = ["2008"]
     # main project directory 
-    PROJECT_FOLDER = "/deep/u/sjayyang/tfrecords"
+    PROJECT_IN_FOLDER = "/deep/u/yy01/tfrecords/"
+    # NOTE: change the out folder accordingly
+    PROJECT_OUT_FOLDER = "/deep/u/yy01/images_npy" 
     # where data folders are stored (probably full_dataset_tfrecord)
-    in_folder = PROJECT_FOLDER + "/" + "tfrecords_fake/"
-    # where dat folders should be  written 
-    out_folder = PROJECT_FOLDER + "/" + "tfrecords_fake_out/" 
+    in_folder = PROJECT_IN_FOLDER
+    # where data folders should be written 
+    out_folder = PROJECT_OUT_FOLDER + "/" + "AL2008/" 
 
     # make sure path is correct 
     CSV_FILE = "/deep2/u/sjayyang/hi.csv"
-    print("Reading csv file")
+    print(f"Reading csv file from {CSV_FILE}...")
     df = pd.read_csv(CSV_FILE)
     print("Finished csv file")
+
+    # Filter out rows with NaN "Mean_BMI" column
+    df = df.dropna(subset=["Mean_BMI"])
 
     # Function to extract the country code from the file name
     def extract_country_code(file_name):
@@ -133,12 +149,15 @@ if __name__ == "__main__":
 
     # class encoding 
     # NOTE: change to use different discretization 
-    df["Mean_BMI_bin"] = np.select(
-        [df["Mean_BMI"] <= 19.9, df["Mean_BMI"] <= 24.9, True], 
-        [0, 1, 2]
-    )
-    N_CLASSES = df["Mean_BMI_bin"].drop_duplicates().shape[0]
-    dhsid_label_dict = dict(zip(df["DHSID"], df["Mean_BMI_bin"]))
+    # df["Mean_BMI_bin"] = np.select(
+    #     [df["Mean_BMI"] <= 19.9, df["Mean_BMI"] <= 24.9, True], 
+    #     [0, 1, 2]
+    # )
+    # N_CLASSES = df["Mean_BMI_bin"].drop_duplicates().shape[0]
+    # dhsid_label_dict = dict(zip(df["DHSID"], df["Mean_BMI_bin"]))
+
+    # NOTE: For regression
+    dhsid_label_dict = dict(zip(df["DHSID"], df["Mean_BMI"]))
 
     # get country years 
     country_years = df[["country", "year"]].drop_duplicates().reset_index(drop=True).values
@@ -149,10 +168,10 @@ if __name__ == "__main__":
     # make folders (TODO: check if they exist)
     if not os.path.exists(out_folder):
         os.makedirs(out_folder)
-    N_CLASSES = 3
-    for i in range(N_CLASSES):
-        if not os.path.exists(out_folder + "class_" + str(i)):
-          os.mkdir(out_folder + "class_" + str(i))
+    
+    # for i in range(N_CLASSES):
+    #     if not os.path.exists(out_folder + "class_" + str(i)):
+    #       os.mkdir(out_folder + "class_" + str(i))
 
     # loop over each pair
     for c, y in country_year_pairs: 
