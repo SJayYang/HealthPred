@@ -149,14 +149,13 @@ if __name__ == "__main__":
 
     # class encoding 
     # NOTE: change to use different discretization 
-    # df["Mean_BMI_bin"] = np.select(
-    #     [df["Mean_BMI"] <= 19.9, df["Mean_BMI"] <= 24.9, True], 
-    #     [0, 1, 2]
-    # )
-    # N_CLASSES = df["Mean_BMI_bin"].drop_duplicates().shape[0]
-    # dhsid_label_dict = dict(zip(df["DHSID"], df["Mean_BMI_bin"]))
+    # Use this line to make a new csv file
+    df["Mean_BMI_bin"] = pd.qcut(df["Mean_BMI"], q=5, labels=False)
 
-    # NOTE: For regression
+    N_CLASSES = df["Mean_BMI_bin"].drop_duplicates().shape[0]
+    dhsid_label_dict = dict(zip(df["DHSID"], df["Mean_BMI_bin"]))
+
+    # NOTE: This is for regression
     dhsid_label_dict = dict(zip(df["DHSID"], df["Mean_BMI"]))
 
     # get country years 
@@ -169,6 +168,7 @@ if __name__ == "__main__":
     if not os.path.exists(out_folder):
         os.makedirs(out_folder)
     
+    # # NOTE: need this only you want to save each class to separate folders
     # for i in range(N_CLASSES):
     #     if not os.path.exists(out_folder + "class_" + str(i)):
     #       os.mkdir(out_folder + "class_" + str(i))
