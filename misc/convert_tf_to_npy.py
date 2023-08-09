@@ -36,7 +36,6 @@ def convert_filename_to_dhsid(file):
   num = file.split("_")[-1].split(".")[0]
   num_just = num.rjust(8, "0")
   return code + num_just
-#   return (code + num_just, code + "_" + code[2:6] + "_" + num_just + ".0")
 
 
 def check_valid_file(file, dhsid_dict):
@@ -103,19 +102,20 @@ def convert_tfrec_to_npy(in_files_paths, out_folder, label_dict):
 if __name__ == "__main__":
 
     ## NOTE: FILL THESE IN: 
-    country_codes = ["AL", "MW"]
+    country_codes = ["AL"]
     # year_codes = ["1996"]
     # main project directory 
-    PROJECT_IN_FOLDER = "/deep/u/yy01/tfrecords/"
+    PROJECT_IN_FOLDER = "/deep/u/sjayyang/tfrecords/gdrive/"
     # NOTE: change the out folder accordingly
-    PROJECT_OUT_FOLDER = "/deep/u/yy01/images_npy" 
+    PROJECT_OUT_FOLDER = "/deep/u/sjayyang/tfrecords/tfrecords_test_out2/" 
     # where data folders are stored (probably full_dataset_tfrecord)
     in_folder = PROJECT_IN_FOLDER
     # where data folders should be written 
-    out_folder = PROJECT_OUT_FOLDER + "/" + "AL2008/" 
+    out_folder = PROJECT_OUT_FOLDER
 
     # make sure path is correct 
     CSV_FILE = "/deep2/u/sjayyang/hi.csv"
+    CSV_FILE_NEW = "/deep2/u/sjayyang/hi2.csv"
     print(f"Reading csv file from {CSV_FILE}...")
     df = pd.read_csv(CSV_FILE)
     print("Finished csv file")
@@ -173,11 +173,6 @@ if __name__ == "__main__":
     if not os.path.exists(out_folder):
         os.makedirs(out_folder)
     
-    # # NOTE: need this only you want to save each class to separate folders
-    # for i in range(N_CLASSES):
-    #     if not os.path.exists(out_folder + "class_" + str(i)):
-    #       os.mkdir(out_folder + "class_" + str(i))
-
     # loop over each pair
     for c, y in country_year_pairs: 
         print(f"Country {c} in year {y}")
